@@ -12,7 +12,7 @@ export function Hero() {
       >
         <h1 className="text-balance text-4xl font-semibold tracking-[-0.025em] text-foreground sm:text-5xl md:text-[3.5rem] md:leading-[1.05]">
           Beat the ATS in Seconds.{" "}
-          <span className="text-primary">Check &amp; Optimize Your Resume Free.</span>
+          <span className="text-primary sm:block">Check &amp; Optimize Your Resume Free.</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
           Your resume is parsed and scored in your browser, then upgraded with the keywords you can
