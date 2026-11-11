@@ -134,3 +134,88 @@ function findPhone(raw: string): string | null {
   }
   return null;
 }
+
+// ── Structured resume document (preview + export) ──────────────────────
+
+/** The structure the preview and exporters render. Same shape as the AI output (minus keyword notes). */
+export interface ResumeDocument {
+  name: string;
+  contact: string;
+  summary: string;
+  sections: { title: string; bullets: string[] }[];
+}
+
+export const stripBulletMarker = (line: string) => line.replace(BULLET_RE, "").trim();
+
+const normHeading = (s: string) => s.trim().replace(/[:|]+$/, "").trim().toLowerCase().replace(/\s+/g, " ");
+const YEAR_RE = /\b(19|20)\d{2}\b|\bpresent\b|\bcurrent\b/i;
+
+/**
+ * A role / degree line ("Senior Engineer, Acme — Jan 2020 – Present"):
+ * short, contains a year or "Present", and doesn't read like a sentence.
+ * Rendered bold without a bullet in the preview and exports.
+ */
+export function isEntryHeading(line: string): boolean {
+  const t = stripBulletMarker(line);
+  if (!t || /[.!?]$/.test(t)) return false;
+  return YEAR_RE.test(t) && t.split(/\s+/).length <= 16;
+}
+
+/**
+ * Re-parse plain resume text (e.g. an edited preview) into a ResumeDocument.
+ * `knownHeadings` lets custom section titles (from the AI output) round-trip.
+ */
+export function parseResumeText(raw: string, knownHeadings: string[] = []): ResumeDocument {
+  const known = new Set(knownHeadings.map(normHeading));
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\u00a0/g, " ").trim())
+    .filter(Boolean);
+
+  let name = "";
+  const contact: string[] = [];
+  const summary: string[] = [];
+  const sections: ResumeDocument["sections"] = [];
+  let current: ResumeDocument["sections"][number] | "summary" | null = null;
+
+  for (const line of lines) {
+    const kind = headingKind(line) ?? (known.has(normHeading(line)) ? "other" : null);
+    if (kind) {
+      if (kind === "summary") current = "summary";
+      else {
+        current = { title: line.replace(/[:|]+$/, "").trim(), bullets: [] };
+        sections.push(current);
+      }
+      continue;
+    }
+    if (current === null) {
+      // Header block: name, contact, then any headline text.
+      if (!name && (looksLikeName(line) || (!contact.length && !summary.length && !isContact(line) && line.length <= 60))) name = line;
+      else if (isContact(line)) contact.push(line);
+      else summary.push(stripBulletMarker(line));
+      continue;
+    }
+    if (current === "summary") summary.push(stripBulletMarker(line));
+    else current.bullets.push(stripBulletMarker(line));
+  }
+
+  // No recognizable headings: keep the body as one section rather than a giant summary.
+  if (!sections.length && summary.length > 3) {
+    sections.push({ title: "Details", bullets: summary.splice(0) });
+  }
+
+  return { name, contact: contact.join(" | "), summary: summary.join(" "), sections: sections.filter((s) => s.bullets.length) };
+}
+
+/** Plain text mirroring the preview layout (role lines without bullets). Round-trips through parseResumeText. */
+export function documentToText(doc: ResumeDocument): string {
+  const out: string[] = [];
+  if (doc.name) out.push(doc.name);
+  if (doc.contact) out.push(doc.contact);
+  if (doc.summary) out.push("", "Summary", doc.summary);
+  for (const s of doc.sections) {
+    out.push("", s.title);
+    for (const b of s.bullets) out.push(isEntryHeading(b) ? b : `• ${b}`);
+  }
+  return out.join("\n").trim();
+}

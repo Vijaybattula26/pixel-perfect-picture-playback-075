@@ -60,6 +60,8 @@
   --color-score-mid-soft: var(--score-mid-soft);
   --color-score-mid-foreground: var(--score-mid-foreground);
   --color-score-high-foreground: var(--score-high-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -117,6 +119,9 @@
   --score-low-foreground: oklch(0.505 0.213 27.518); /* #B91C1C */
   --score-mid-soft: oklch(0.987 0.022 95.277); /* #FFFBEB */
   --score-mid-foreground: oklch(0.473 0.137 46.201); /* #92400E */
+  /* Added-keyword highlight in the resume preview */
+  --highlight: oklch(0.95 0.052 163.051); /* #D1FAE5 emerald-100 */
+  --highlight-foreground: oklch(0.432 0.095 166.913); /* #065F46 emerald-800 */
 
   --destructive: oklch(0.577 0.245 27.325); /* #DC2626 for text (AA) */
   --destructive-soft: oklch(0.971 0.013 17.38); /* #FEF2F2 */
