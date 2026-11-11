@@ -2,6 +2,7 @@ import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { ClipboardPaste, CloudUpload, FileUser, Lock } from "lucide-react";
 
 import { useAnalyzer } from "@/hooks/use-analyzer";
+import { RESUME_MAX_CHARS } from "@/lib/constants";
 import type { ResumeInputMode } from "@/types/analyzer";
 import { AutoTextarea } from "./AutoTextarea";
 import { CharCounter } from "./CharCounter";
@@ -50,12 +51,13 @@ export function ResumeCard() {
           <AutoTextarea
             id="resume-text"
             value={pastedText}
+            maxLength={RESUME_MAX_CHARS}
             onChange={(e) => setPastedText(e.target.value)}
             placeholder="Paste the full text of your resume here…"
             aria-describedby="resume-count"
             className="min-h-64 flex-1"
           />
-          <CharCounter id="resume-count" count={pastedText.trim().length} />
+          <CharCounter id="resume-count" count={pastedText.trim().length} max={RESUME_MAX_CHARS} />
         </TabsPrimitive.Content>
       </TabsPrimitive.Root>
 

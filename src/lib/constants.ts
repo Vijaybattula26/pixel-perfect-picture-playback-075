@@ -1,6 +1,8 @@
 export const MIN_INPUT_CHARS = 100;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
-export const JD_MAX_CHARS = 20000;
+export const JD_MAX_CHARS = 12000;
+export const RESUME_MAX_CHARS = 20000;
+export const MAX_APPROVED_KEYWORDS = 40;
 
 export const ACCEPTED_FILE_TYPES = {
   "application/pdf": [".pdf"],

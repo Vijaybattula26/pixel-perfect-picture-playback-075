@@ -6,6 +6,7 @@ import { Hero } from "@/components/resume-pulse/Hero";
 import { JobDescriptionCard } from "@/components/resume-pulse/JobDescriptionCard";
 import { Navbar } from "@/components/resume-pulse/Navbar";
 import { ResumeCard } from "@/components/resume-pulse/ResumeCard";
+import { ResultsSection } from "@/components/resume-pulse/ResultsSection";
 import { SiteFooter } from "@/components/resume-pulse/SiteFooter";
 import { AnalyzerProvider } from "@/hooks/use-analyzer";
 
@@ -52,6 +53,7 @@ function Index() {
               <div className="mt-6">
                 <AnalyzeButton />
               </div>
+              <ResultsSection />
             </motion.div>
           </main>
           <SiteFooter />

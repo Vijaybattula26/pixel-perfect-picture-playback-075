@@ -9,8 +9,11 @@ import {
   FileType,
   FileCode,
   LoaderCircle,
+  ScanText,
   X,
 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 import { useAnalyzer } from "@/hooks/use-analyzer";
 import { ACCEPT_ATTR } from "@/lib/constants";
@@ -32,10 +35,10 @@ const fade = {
 };
 
 export function FileDropzone() {
-  const { upload, handleFile, removeFile, setDragging } = useAnalyzer();
+  const { upload, handleFile, removeFile, setDragging, runOcr } = useAnalyzer();
   const inputRef = useRef<HTMLInputElement>(null);
   const { status } = upload;
-  const interactive = status !== "parsing" && status !== "success";
+  const interactive = status !== "parsing" && status !== "success" && status !== "scanned";
 
   const open = () => interactive && inputRef.current?.click();
 
@@ -93,6 +96,7 @@ export function FileDropzone() {
           status === "dragging" && "border-primary bg-primary-soft ring-4 ring-primary/10",
           status === "parsing" && "border-border-strong bg-muted/50",
           status === "success" && "border-solid border-score-high/40 bg-score-high-soft",
+          status === "scanned" && "border-solid border-score-mid/50 bg-score-mid-soft",
           status === "error" && "border-destructive/50 bg-destructive-soft hover:border-destructive",
         )}
       >
@@ -137,7 +141,7 @@ export function FileDropzone() {
                 Reading {upload.file?.name ?? "file"}…
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {upload.file?.kind === "image" ? "Running text recognition in your browser" : "Parsing in your browser"}
+                {upload.ocr ? "Running text recognition in your browser" : "Parsing in your browser"}
               </p>
               {upload.progress !== null && (
                 <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-border" aria-hidden>
@@ -177,6 +181,42 @@ export function FileDropzone() {
             </motion.div>
           )}
 
+          {status === "scanned" && upload.file && (
+            <motion.div key="scanned" {...fade} className="flex w-full max-w-sm flex-col items-center">
+              <span className="grid size-12 place-items-center rounded-xl border border-score-mid/30 bg-card text-score-mid-foreground">
+                <ScanText className="size-5" aria-hidden />
+              </span>
+              <p className="mt-4 text-sm font-medium text-foreground">This PDF looks scanned</p>
+              <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                We found almost no text in {upload.file.name}. Run text recognition (OCR) in your
+                browser to read it.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void runOcr();
+                  }}
+                >
+                  <ScanText aria-hidden /> Run OCR
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile();
+                  }}
+                >
+                  Choose another file
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {status === "error" && (
             <motion.div key="error" {...fade} className="flex flex-col items-center">
               <span className="grid size-12 place-items-center rounded-xl border border-destructive/20 bg-card text-destructive">
@@ -192,6 +232,7 @@ export function FileDropzone() {
 
         <span id="dropzone-status" className="sr-only" aria-live="polite">
           {status === "parsing" && "Parsing file"}
+          {status === "scanned" && "This PDF looks scanned. Run OCR to read it."}
           {status === "success" && `${upload.file?.name} uploaded`}
           {status === "error" && upload.error}
         </span>

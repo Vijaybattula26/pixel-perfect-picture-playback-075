@@ -31,5 +31,8 @@ use the editor.
 
 ## Project rules
 - All analyzer state (resume text, job description, status, results, upload state) lives in `AnalyzerProvider` (`src/hooks/use-analyzer.tsx`); components read it via `useAnalyzer()` — single source of truth.
-- Resume file parsers (pdfjs-dist, mammoth, tesseract.js) are dynamically imported inside `src/lib/parse-file.ts` — they need browser globals and must never load during SSR.
+- Resume file parsers (pdfjs-dist, mammoth, tesseract.js) are dynamically imported inside `src/lib/parsers.ts` — they need browser globals and must never load during SSR.
+- Keyword Match Score lives in pure, deterministic modules (`atsScorer.ts`, `skillsDictionary.ts`, `resumeSections.ts`, `resumeTips.ts`) with the formula documented at the top of `atsScorer.ts` — scoring runs in the browser, so it must stay side-effect free.
+- AI optimization is a TanStack `createServerFn` (`src/lib/optimize.functions.ts`, Gemini call in `gemini.server.ts` loaded via dynamic import), not a Supabase Edge Function — this stack has no Cloud backend; it returns typed `{ ok:false, code }` errors so the UI can fall back to No-AI mode.
+- The optimize request contract (limits, response shape) lives in client-safe `src/lib/optimize-schema.ts`, shared by client pre-checks and the server.
 - Input gating and file validation rules live in `src/lib/validation.ts` with tests beside them — keep rule changes covered there.
