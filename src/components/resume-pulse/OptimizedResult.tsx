@@ -33,7 +33,10 @@ export function OptimizedResult() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={async () => toast[(await copyText(plainText)) ? "success" : "error"]((await copyText(plainText)) ? "Copied to clipboard" : "Couldn't copy")}
+            onClick={async () => {
+              const ok = await copyText(plainText);
+              toast[ok ? "success" : "error"](ok ? "Copied to clipboard" : "Couldn't copy");
+            }}
           >
             <Copy aria-hidden /> Copy text
           </Button>
