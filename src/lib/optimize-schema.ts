@@ -49,7 +49,7 @@ export const optimizedResumeSchema = z.object({
 
 export type OptimizedResume = z.infer<typeof optimizedResumeSchema>;
 
-export type OptimizeErrorCode = "INVALID_INPUT" | "RATE_LIMITED" | "AI_UNAVAILABLE" | "NOT_CONFIGURED";
+export type OptimizeErrorCode = "INVALID_INPUT" | "RATE_LIMITED" | "AI_UNAVAILABLE";
 
 export type OptimizeResponse =
   | { ok: true; resume: OptimizedResume }

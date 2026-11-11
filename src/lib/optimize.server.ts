@@ -1,7 +1,9 @@
 /**
- * Server-only: calls Google's Gemini API to rewrite a resume.
- * Never log resume or job-description text — only status codes.
+ * Server-only: rewrites a resume with Gemini through Lovable AI.
+ * Never log resume or job-description text — only error codes and request ids.
  */
+import { GatewayError, PaymentRequiredError, RateLimitError, generateChatCompletion } from "@lovable.dev/ai-gateway";
+
 import { createRateLimiter } from "./rate-limit";
 import {
   optimizedResumeSchema,
@@ -10,8 +12,7 @@ import {
   type OptimizedResume,
 } from "./optimize-schema";
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const MODEL = "google/gemini-3.8-flash";
 
 // 5 requests per minute per IP (best effort, per server instance).
 export const optimizeRateLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
@@ -20,28 +21,28 @@ const SYSTEM_INSTRUCTION =
   "You are an expert resume editor. Use ONLY facts present in the resume. Integrate ONLY the approved keywords, and only where the candidate's experience genuinely supports them. Use strong action verbs and ATS-friendly plain wording. Keep all numbers, dates, employers, titles and degrees exactly as given. Never invent roles, tools, degrees, metrics or skills. If a keyword is not supported, skip it. Output only the JSON object, no markdown, no commentary.";
 
 const RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
+  additionalProperties: false,
   properties: {
-    name: { type: "STRING" },
-    contact: { type: "STRING" },
-    summary: { type: "STRING" },
+    name: { type: "string" },
+    contact: { type: "string" },
+    summary: { type: "string" },
     sections: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "OBJECT",
+        type: "object",
+        additionalProperties: false,
         properties: {
-          title: { type: "STRING" },
-          bullets: { type: "ARRAY", items: { type: "STRING" } },
+          title: { type: "string" },
+          bullets: { type: "array", items: { type: "string" } },
         },
         required: ["title", "bullets"],
-        propertyOrdering: ["title", "bullets"],
       },
     },
-    addedKeywords: { type: "ARRAY", items: { type: "STRING" } },
-    changeNotes: { type: "ARRAY", items: { type: "STRING" } },
+    addedKeywords: { type: "array", items: { type: "string" } },
+    changeNotes: { type: "array", items: { type: "string" } },
   },
   required: ["name", "contact", "summary", "sections", "addedKeywords", "changeNotes"],
-  propertyOrdering: ["name", "contact", "summary", "sections", "addedKeywords", "changeNotes"],
 };
 
 function buildPrompt({ resumeText, jobDescription, approvedKeywords }: OptimizeRequest): string {
@@ -65,32 +66,21 @@ function buildPrompt({ resumeText, jobDescription, approvedKeywords }: OptimizeR
   ].join("\n");
 }
 
-class GeminiHttpError extends Error {
-  constructor(public status: number) {
-    super(`Gemini HTTP ${status}`);
-  }
-}
-
-async function callGeminiOnce(apiKey: string, req: OptimizeRequest): Promise<unknown> {
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    signal: AbortSignal.timeout(60_000),
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      contents: [{ role: "user", parts: [{ text: buildPrompt(req) }] }],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
-    }),
+async function callModelOnce(req: OptimizeRequest): Promise<unknown> {
+  const completion = await generateChatCompletion({
+    model: MODEL,
+    messages: [
+      { role: "system", content: SYSTEM_INSTRUCTION },
+      { role: "user", content: buildPrompt(req) },
+    ],
+    temperature: 0.3,
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "optimized_resume", strict: true, schema: RESPONSE_SCHEMA },
+    },
   });
-  if (!res.ok) throw new GeminiHttpError(res.status);
-  const body = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  const content = completion.choices?.[0]?.message?.content;
+  const text = typeof content === "string" ? content : "";
   // Strip accidental code fences before parsing.
   return JSON.parse(text.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ""));
 }
@@ -101,27 +91,32 @@ function enforceApproved(resume: OptimizedResume, approved: string[]): Optimized
   return { ...resume, addedKeywords: resume.addedKeywords.filter((k) => allowed.has(k.trim().toLowerCase())) };
 }
 
-export async function optimizeWithGemini(apiKey: string, req: OptimizeRequest): Promise<OptimizeResponse> {
+const UNAVAILABLE = { ok: false, code: "AI_UNAVAILABLE", message: "The AI service is unavailable right now. Please try again later." } as const;
+
+export async function optimizeWithAI(req: OptimizeRequest): Promise<OptimizeResponse> {
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
-      const raw = await callGeminiOnce(apiKey, req);
+      const raw = await callModelOnce(req);
       const parsed = optimizedResumeSchema.safeParse(raw);
       if (parsed.success) return { ok: true, resume: enforceApproved(parsed.data, req.approvedKeywords) };
-      console.warn(`[optimize] invalid JSON shape from Gemini (attempt ${attempt})`);
+      console.warn(`[optimize] invalid JSON shape from model (attempt ${attempt})`);
     } catch (err) {
-      if (err instanceof GeminiHttpError) {
-        console.error(`[optimize] Gemini responded ${err.status}`);
-        if (err.status === 429) {
-          return { ok: false, code: "RATE_LIMITED", message: "The AI service is busy right now. Please try again in a minute." };
-        }
-        return { ok: false, code: "AI_UNAVAILABLE", message: "The AI service is unavailable right now. Please try again later." };
-      }
       if (err instanceof SyntaxError) {
-        console.warn(`[optimize] unparseable JSON from Gemini (attempt ${attempt})`);
+        console.warn(`[optimize] unparseable JSON from model (attempt ${attempt})`);
         continue; // retry once
       }
-      console.error("[optimize] request to Gemini failed", (err as Error)?.name);
-      return { ok: false, code: "AI_UNAVAILABLE", message: "The AI service is unavailable right now. Please try again later." };
+      if (err instanceof GatewayError) {
+        console.error(`[optimize] AI error ${err.code} status=${err.httpStatus ?? "-"} ids=${JSON.stringify(err.ids ?? {})}`);
+        if (err instanceof RateLimitError) {
+          return { ok: false, code: "RATE_LIMITED", message: "The AI service is busy right now. Please try again in a minute." };
+        }
+        if (err instanceof PaymentRequiredError) {
+          return { ok: false, code: "AI_UNAVAILABLE", message: "AI optimization is paused right now. Please try again later." };
+        }
+        return UNAVAILABLE;
+      }
+      console.error("[optimize] unexpected failure", (err as Error)?.name);
+      return UNAVAILABLE;
     }
   }
   return { ok: false, code: "AI_UNAVAILABLE", message: "The AI returned an unreadable answer. Please try again." };

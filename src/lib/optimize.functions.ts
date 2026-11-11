@@ -5,7 +5,7 @@ import { parseOptimizeRequest, type OptimizeResponse } from "./optimize-schema";
 
 /**
  * Public (no login) AI resume optimizer. Validates input, applies a per-IP
- * rate limit, then calls Gemini with the GEMINI_API_KEY secret.
+ * rate limit, then calls Gemini through Lovable AI.
  * Resume text is never stored or logged.
  */
 export const optimizeResume = createServerFn({ method: "POST" })
@@ -19,7 +19,7 @@ export const optimizeResume = createServerFn({ method: "POST" })
       return { ok: false, code: "INVALID_INPUT", message: parsed.message };
     }
 
-    const { optimizeRateLimiter, optimizeWithGemini } = await import("./gemini.server");
+    const { optimizeRateLimiter, optimizeWithAI } = await import("./optimize.server");
 
     const ip = getRequestHeader("cf-connecting-ip") ?? getRequestIP({ xForwardedFor: true }) ?? "unknown";
     const limit = optimizeRateLimiter.check(ip);
@@ -33,14 +33,7 @@ export const optimizeResume = createServerFn({ method: "POST" })
       };
     }
 
-    const apiKey = process.env['GEMINI_API_KEY'];
-    if (!apiKey) {
-      console.error("[optimize] GEMINI_API_KEY is not set");
-      setResponseStatus(503);
-      return { ok: false, code: "NOT_CONFIGURED", message: "AI optimization isn't set up yet." };
-    }
-
-    const result = await optimizeWithGemini(apiKey, parsed.data);
+    const result = await optimizeWithAI(parsed.data);
     if (!result.ok) setResponseStatus(result.code === "RATE_LIMITED" ? 429 : 503);
     return result;
   });
