@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+- All analyzer state (resume text, job description, status, results, upload state) lives in `AnalyzerProvider` (`src/hooks/use-analyzer.tsx`); components read it via `useAnalyzer()` — single source of truth.
+- Resume file parsers (pdfjs-dist, mammoth, tesseract.js) are dynamically imported inside `src/lib/parse-file.ts` — they need browser globals and must never load during SSR.
+- Input gating and file validation rules live in `src/lib/validation.ts` with tests beside them — keep rule changes covered there.

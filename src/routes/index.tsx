@@ -1,23 +1,62 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { MotionConfig, motion } from "framer-motion";
 
-// The home route ships no og:image, so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+import { AnalyzeButton } from "@/components/resume-pulse/AnalyzeButton";
+import { Hero } from "@/components/resume-pulse/Hero";
+import { JobDescriptionCard } from "@/components/resume-pulse/JobDescriptionCard";
+import { Navbar } from "@/components/resume-pulse/Navbar";
+import { ResumeCard } from "@/components/resume-pulse/ResumeCard";
+import { SiteFooter } from "@/components/resume-pulse/SiteFooter";
+import { AnalyzerProvider } from "@/hooks/use-analyzer";
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "ResumePulse — Free ATS Resume Keyword Checker" },
+      {
+        name: "description",
+        content:
+          "Check your resume against any job description in seconds. Free ATS keyword match score, parsed in your browser. No signup.",
+      },
+      { property: "og:title", content: "ResumePulse — Free ATS Resume Keyword Checker" },
+      {
+        property: "og:description",
+        content:
+          "Beat the ATS in seconds. Free keyword match score and honest resume optimization, parsed in your browser.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <MotionConfig reducedMotion="user">
+      <AnalyzerProvider>
+        <div className="flex min-h-screen flex-col">
+          <Navbar />
+          <main className="flex-1">
+            <Hero />
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+              className="mx-auto max-w-6xl px-4 pb-20 sm:px-6"
+            >
+              <div className="grid items-stretch gap-5 md:grid-cols-2 md:gap-6">
+                <ResumeCard />
+                <JobDescriptionCard />
+              </div>
+              <div className="mt-6">
+                <AnalyzeButton />
+              </div>
+            </motion.div>
+          </main>
+          <SiteFooter />
+        </div>
+      </AnalyzerProvider>
+    </MotionConfig>
   );
 }
